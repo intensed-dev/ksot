@@ -3,7 +3,7 @@ Koster Object Table
 
 ## Example
 Plain ksot without features
-```ksot
+```json
 {
     "name": "test",
     "color": "0xFFFFD700",
@@ -15,7 +15,7 @@ Plain ksot without features
 ```
 
 Ksot with features
-```ksot
+```json
 @ksot
 
 @com ==================
