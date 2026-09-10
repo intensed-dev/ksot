@@ -7,7 +7,7 @@ Plain ksot without features
 {
     "name": "test",
     "color": "0xFFFFD700",
-    "number: 10,
+    "number": 10,
     "object": {
         "array": ["apple", "peach"]
     }
@@ -25,7 +25,7 @@ Ksot with features
 {
     "name": String: "test",
     "color": Color: 0xFFFFD700,
-    "number: Int: 10,
+    "number": Int: 10,
     "object": Object: {
         "array": Array: ["apple", "peach"]
     }
