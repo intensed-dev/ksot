@@ -28,14 +28,19 @@ test("parses KSOT types and comments", () => {
 
 test("supports imports and interpolation", () => {
   const files = {
-    "metadata.ksot": `@ksot\n{\n  "version": "1.2.3",\n  "author": "Intense"\n}`
+    "metadata.ksot": `@ksot
+{
+  "version": "1.2.3",
+  "author": "Intense"
+}`
   };
-  const source = `@ksot\n@imp { version, author } from "metadata.ksot"\n$"version": "${metadata.version}"`;
-  // The interpolation expression is intentionally assembled below so the JS test runner does not evaluate it.
-  const ksot = source.replace("${metadata.version}", "${metadata.version}");
-  assert.deepEqual(parse(ksot, { resolveImport: (path) => files[path] }), { version: "1.2.3" });
+  const source = `@ksot
+@imp { version, author } from "metadata.ksot"
+$"version": "\${metadata.version}"`;
+  assert.deepEqual(parse(source, { resolveImport: (path) => files[path] }), { version: "1.2.3" });
 });
 
 test("compile returns formatted JSON", () => {
-  assert.equal(compile(`@ksot\n{ "value": Int: 42 }`), '{\n  "value": 42\n}');
+  assert.equal(compile(`@ksot
+{ "value": Int: 42 }`), '{\n  "value": 42\n}');
 });
