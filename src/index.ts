@@ -37,7 +37,7 @@ export function parse(source: string, options: CompileOptions = {}): KSOTValue {
   const first = lines.findIndex((line) => line.trim() !== "");
   if (first === -1) return {};
 
-  // A KSOT file without @ksot is deliberately JSON-compatible.
+  // Without @ksot, the format is plain JSON.
   if (lines[first].trim() !== "@ksot") {
     try { return JSON.parse(source) as KSOTValue; }
     catch (error) { throw new KSOTError(`Invalid JSON: ${(error as Error).message}`); }
@@ -47,14 +47,14 @@ export function parse(source: string, options: CompileOptions = {}): KSOTValue {
   const plugins = options.plugins ?? [];
   const context: PluginContext = { sourceName: options.sourceName, imports };
   const body: string[] = [];
-  let bodyStarted = false;
 
   for (let i = 0; i < lines.length; i++) {
     const original = lines[i];
     const trimmed = original.trim();
     if (!trimmed || trimmed === "@ksot") continue;
 
-    if (!bodyStarted && (trimmed.startsWith("@com ") || trimmed === "@com" || trimmed.startsWith("@comment ") || trimmed === "@comment")) continue;
+    // Comments are valid anywhere in a KSOT file.
+    if (trimmed === "@com" || trimmed.startsWith("@com ") || trimmed === "@comment" || trimmed.startsWith("@comment ")) continue;
 
     const imp = trimmed.match(/^@(imp|import)\s+\{([^}]*)\}\s+from\s+["']([^"']+)["']\s*$/);
     if (imp) {
@@ -91,8 +91,7 @@ export function parse(source: string, options: CompileOptions = {}): KSOTValue {
       continue;
     }
 
-    bodyStarted = true;
-    // `$` is a line-level interpolation marker. It must be the first non-whitespace character.
+    // `$` is a line-level interpolation marker and must be the first non-whitespace character.
     body.push(trimmed.startsWith("$") ? trimmed.slice(1) : original);
   }
 
@@ -101,10 +100,7 @@ export function parse(source: string, options: CompileOptions = {}): KSOTValue {
   const interpolated = interpolate(expanded, imports);
 
   try { return JSON.parse(interpolated) as KSOTValue; }
-  catch (error) {
-    const message = (error as Error).message;
-    throw new KSOTError(`Invalid KSOT object: ${message}`);
-  }
+  catch (error) { throw new KSOTError(`Invalid KSOT object: ${(error as Error).message}`); }
 }
 
 export function compile(source: string, options: CompileOptions = {}): string {
@@ -112,8 +108,6 @@ export function compile(source: string, options: CompileOptions = {}): string {
 }
 
 function expandTypesAndValues(input: string, plugins: KSOTPlugin[], context: PluginContext): string {
-  // Typed values occur between a colon and the value: "key": Type: value.
-  // This scanner handles quoted strings, arrays, objects and scalar values without rewriting strings.
   let out = "";
   let i = 0;
   while (i < input.length) {
@@ -129,14 +123,11 @@ function expandTypesAndValues(input: string, plugins: KSOTPlugin[], context: Plu
       const typed = after.match(/^(\s*:\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/);
       if (!typed) continue;
       const type = typed[2];
-      if (!BUILTIN_TYPES.has(type) && !plugins.some((p) => p.type)) {
-        throw new KSOTError(`Unknown type '${type}'`);
-      }
+      if (!BUILTIN_TYPES.has(type) && !plugins.some((p) => p.type)) throw new KSOTError(`Unknown type '${type}'`);
       out += typed[1];
       i += typed[0].length;
       const [value, consumed] = readValue(input, i);
-      const converted = convertTypedValue(type, value, plugins, context);
-      out += JSON.stringify(converted);
+      out += JSON.stringify(convertTypedValue(type, value, plugins, context));
       i += consumed;
       continue;
     }
@@ -199,10 +190,18 @@ function convertTypedValue(type: string, raw: string, plugins: KSOTPlugin[], con
     return raw;
   }
   if (type === "Object") {
-    try { const value = JSON.parse(raw); if (!isObject(value)) throw new Error(); return value; } catch { throw new KSOTError(`Expected object, got '${raw}'`); }
+    try {
+      const value = JSON.parse(expandTypesAndValues(raw, plugins, context));
+      if (!isObject(value)) throw new Error();
+      return value;
+    } catch { throw new KSOTError(`Expected object, got '${raw}'`); }
   }
   if (type === "Array") {
-    try { const value = JSON.parse(raw); if (!Array.isArray(value)) throw new Error(); return value; } catch { throw new KSOTError(`Expected array, got '${raw}'`); }
+    try {
+      const value = JSON.parse(expandTypesAndValues(raw, plugins, context));
+      if (!Array.isArray(value)) throw new Error();
+      return value;
+    } catch { throw new KSOTError(`Expected array, got '${raw}'`); }
   }
   if (type === "Auto") {
     if (raw === "null" || raw === "unset") return null;
